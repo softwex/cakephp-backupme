@@ -34,26 +34,42 @@ class BackupShell extends Shell {
         
         //directory to save your backup, it will be created automatically if not found., default is webroot/db-backups/yyyy-mm-dd
         if(!isset($this->args[2])){
-            $this->args[2] = 'db-backups/'.date('Y-m-d',time());
+            $this->args[2] = 'webroot/db-backups/'.date('Y-m-d',time());
         }
 
         App::import('Core', 'ConnectionManager');
         $db = ConnectionManager::getDataSource($this->args[0]);
         $backupdir = $this->args[2];
-        $seleced_tables = '*';
-        //$tables = array('orders', 'users', 'profiles');
+        $seleced_entities = '*';
+        //$seleced_entities = array('users', 'users_view');
+        $key = 0;
+        if ($seleced_entities == '*') {
+            //$sources = $db->query("show full tables where Table_Type = 'BASE TABLE'", false);
+            $sources = $db->query("show full tables", false);
 
-        if ($seleced_tables == '*') {
-            $sources = $db->query("show full tables where Table_Type = 'BASE TABLE'", false);
-            foreach($sources as $table){
-                $table = array_shift($table);
-                $tables[] = array_shift($table);
+            foreach($sources as $entity){
+                $entity = array_shift($entity);
+                $entities[$key]['type'] = $entity['Table_type'];
+                $entities[$key]['name'] = array_shift($entity);
+                $key++;
             }
         } else {
-            $tables = is_array($tables) ? $tables : explode(',', $tables);
+            //$seleced_entities = is_array($seleced_entities) ? $seleced_entities : explode(',', $seleced_entities);
+            foreach($seleced_entities as $entity){
+                
+                $info =$db->query("SHOW TABLE STATUS WHERE Name = '".$entity."'", false);
+                $info = array_shift(array_shift($info));
+                if(isset($info['Engine'])){
+                     $entities[$key]['type'] = 'BASE TABLE';
+                }else{
+                    $entities[$key]['type'] = $info['Comment'];
+                }
+                $entities[$key]['name'] = $entity;
+                $key++;
+            }
         }
         
-        $filename = 'db-backup-' . date('Y-m-d-H-i-s',time()) .'_' . (md5(implode(',', $tables))) . '.sql';
+        $filename = 'db-backup-' . date('Y-m-d-H-i-s',time()) .'_' . (md5(time())) . '.sql';
         
         $return = '';
         $limit = $this->args[1];
@@ -76,67 +92,78 @@ class BackupShell extends Shell {
             $this->out(' Starting Backup..');
             $this->out('---------------------------------------------------------------');
 
-            foreach ($tables as $table) {
+            foreach ($entities as $entity) {
                 $this->out(" ",2);
-                $this->out($table);
-                
+                $this->out($entity['name']);
                 $handle = fopen($backupdir.'/'.$filename, 'a+');
-                $return= 'DROP TABLE IF EXISTS `' . $table . '`;';
-                    
-                    $row2 = $db->query('SHOW CREATE TABLE ' . $table.';');
-                    //$this->out($row2);
+                
+                if($entity['type']=='BASE TABLE'){
+    
+                    $return= 'DROP TABLE IF EXISTS `' . $entity['name'] . '`;';
+                    $row2 = $db->query('SHOW CREATE TABLE ' . $entity['name'].';');
                     $return.= "\n\n" . $row2[0][0]['Create Table'] . ";\n\n";
                     fwrite($handle, $return);
-                    
-                for(;;){
-                    if($limit == 0){
-                        $limitation = '';
-                    }else{
-                        $limitation = ' Limit '.$start.', '.$limit;
-                    }
-                    
-                    $result = $db->query('SELECT * FROM ' . $table.$limitation.';', false);
-                    $num_fields = count($result);
-                    $this->ProgressBar->start($num_fields);
-                    
-                    if($num_fields == 0){
-                        $start = 0;
-                        break;
-                    }
 
-                    foreach ($result as $row) {
-                        $this->ProgressBar->next();
-                        $return2 = 'INSERT INTO ' . $table . ' VALUES(';
-                        $j = 0;
-                        foreach ($row[$table] as $key => $inner) {
-                            $j++;
-                            if(isset($inner)){
-                                if ($inner == NULL){
-                                    $return2 .= 'NULL';
-                                }else{
-                                    $inner = addslashes($inner);
-                                    $inner = ereg_replace("\n", "\\n", $inner);
-                                    $return2.= '"' . $inner . '"';
-                                }
-                            }else {
-                                $return2.= '""';
-                            }
-
-                            if ($j < (count($row[$table]))) {
-                                $return2.= ',';
-                            }
+                    for(;;){
+                        if($limit == 0){
+                            $limitation = '';
+                        }else{
+                            $limitation = ' Limit '.$start.', '.$limit;
                         }
-                        $return2.= ");\n";
-                        fwrite($handle, $return2);
-                        
+
+                        $result = $db->query('SELECT * FROM ' . $entity['name'].$limitation.';', false);
+                        $num_fields = count($result);
+                        $this->ProgressBar->start($num_fields);
+
+                        if($num_fields == 0){
+                            $start = 0;
+                            break;
+                        }
+                        foreach ($result as $row) {
+                            $this->ProgressBar->next();
+                            $return2 = 'INSERT INTO ' . $entity['name'] . ' VALUES(';
+                            $j = 0;
+                            foreach ($row[$entity['name']] as $key => $inner) {
+                                $j++;
+                                if(isset($inner)){
+                                    if ($inner == NULL){
+                                        $return2 .= 'NULL';
+                                    }else{
+                                        $inner = addslashes($inner);
+                                        $inner = ereg_replace("\n", "\\n", $inner);
+                                        $return2.= '"' . $inner . '"';
+                                    }
+                                }else {
+                                    $return2.= '""';
+                                }
+
+                                if ($j < (count($row[$entity['name']]))) {
+                                    $return2.= ',';
+                                }
+                            }
+                            $return2.= ");\n";
+                            fwrite($handle, $return2);
+
+                        }
+                        $start+=$limit;
+                        if($limit == 0){
+                            break;
+                        }
                     }
-                    $start+=$limit;
-                    if($limit == 0){
-                        break;
+
+                    $return.="\n\n\n";
+                }elseif($entity['type']=='VIEW') {
+                    
+                    $return= 'DROP VIEW IF EXISTS `' . $entity['name'] . '`;';
+                    $row2 = $db->query('SHOW CREATE VIEW ' . $entity['name'].';');
+                    
+                    $return.= "\n\n" . $row2[0][0]['Create View'] . ";\n\n";
+                    $this->ProgressBar->start(1);
+                    if(fwrite($handle, $return)){
+                        $this->ProgressBar->set(1); 
                     }
+                    //debug($row2); die();
                 }
-                
-                $return.="\n\n\n";
                 fclose($handle);
             }
 
