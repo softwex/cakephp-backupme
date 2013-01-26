@@ -34,17 +34,21 @@ class BackupShell extends Shell {
         
         //directory to save your backup, it will be created automatically if not found., default is webroot/db-backups/yyyy-mm-dd
         if(!isset($this->args[2])){
-            $this->args[2] = 'webroot/db-backups/'.date('Y-m-d',time());
+            $this->args[2] = 'db-backups/'.date('Y-m-d',time());
         }
 
         App::import('Core', 'ConnectionManager');
         $db = ConnectionManager::getDataSource($this->args[0]);
         $backupdir = $this->args[2];
-        $tables = '*';
+        $seleced_tables = '*';
         //$tables = array('orders', 'users', 'profiles');
 
-        if ($tables == '*') {
-            $tables = $db->listSources();
+        if ($seleced_tables == '*') {
+            $sources = $db->query("show full tables where Table_Type = 'BASE TABLE'", false);
+            foreach($sources as $table){
+                $table = array_shift($table);
+                $tables[] = array_shift($table);
+            }
         } else {
             $tables = is_array($tables) ? $tables : explode(',', $tables);
         }
@@ -112,6 +116,7 @@ class BackupShell extends Shell {
                                 }else{
                                     $inner = addslashes($inner);
                                     $inner = ereg_replace("\n", "\\n", $inner);
+                                    $return2.= '"' . $inner . '"';
                                 }
                             }else {
                                 $return2.= '""';
