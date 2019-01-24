@@ -1,15 +1,4 @@
-/*
- * CakePHP shell application to create SQL databases dump backups
- * Copyright (c) 2013 Mohammed Mahgoub
- * www.mmahgoub.com
- * https://bitbucket.org/mmahgoub/cakephp-backupme
- *
- * @author      Mohammed Mahgoub <mmahgoub@gmail.com> @mmahgoub
- * @license     MIT
- *
- */
-
-/* Description */
+##Description
  A shell application to create SQL databases dump backups.
 
  This script is based upon the one written by David Walsh and published on his blog on August 18, 2008
@@ -17,9 +6,9 @@
 
  Many thanks to him!
 
-/* Instructions */
- 1. Download the repo and put it in your app/ folder.
- 2. Open up your CakePHP shell and run the command "cake backup" (You can use cron jobs)
+##Instructions
+1. Download the repo and put it in your app/ folder.
+2. Open up your CakePHP shell and run the command "cake backup" (You can use cron jobs)
 
  - This script backup all of your tables by default but you can select specific tables by 
    uncommenting $tables = array('orders', 'users', 'profiles'); and filling your own table names.
@@ -30,10 +19,10 @@
         $this->ProgressBar->next();
  I don't know why you wanna do that! That progress bar is awesome! Thanks Matt!
  
-/* Arguments */
+##Arguments
  1. Database configuration, default is "default"
  2. Rows per query (less rows = less ram usage but more running time) default is 0 which means all rows
  3. Absolute path for the directory to save your backup, it will be created automatically if not found, default is webroot/db-backups/yyyy-mm-dd
 
-/* Additional possible features */
+#Additional possible features
  1. Upload backup using FTP.
